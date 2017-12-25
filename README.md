@@ -31,4 +31,10 @@ LightTrimmer accepts multiple input files of the sequencing reads given in ***fa
 #### Outputs
 The output of LightTrimmer till now is the set of kmers probabilities from Poisson distribution, in the file:
 
-```kmers_prob.txt``` 
+```
+kmers_prob.txt
+kmers_counts.txt
+kmers_correct.txt
+kmers_info_all.txt
+
+``` 
