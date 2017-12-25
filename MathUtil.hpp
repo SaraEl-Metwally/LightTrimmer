@@ -4,31 +4,105 @@
 #include <random>
 const double pi = 3.14159265358979323846;
 
-void get_cumulative_binomial_distribution( std::vector<double> & F, int l, double p )
+double truncate_num(double num, int places)
 {
-    // p is the probability of getting 1.
-    int i ;
-    double coef = 1 ;
-    double exp = pow( 1 - p, l ) ;
-    F[0] = pow( 1 - p, l ) ;
+double result=0.0;
+int sig = num>0? 1:-1;
+unsigned int temp=(num*pow(10,places))*sig;
+ 
+result=(((double)temp)/pow(10,places)*sig);
+return result;
+
+}
+void get_cumulative_Poisson_distribution( double *F, int l,  double lambda)
+{
+  try
+  {
+    double fact=1;
+    double elambda = exp(-1*lambda) ;
+    F[0]= elambda;
     
-    for ( i = 1 ; i <= l ; ++i )
+    for ( int i = 1 ; i <= l ; ++i )
     {
-        coef = coef / i * ( l - i + 1 ) ;
-        exp =  exp / ( 1 - p ) * p ;
-        F[i] = F[i - 1] + coef * exp ;
+      double t1=pow(lambda,i);
+      fact=fact*i;
+      F[i]=F[i-1]+(elambda*(t1/fact));
+      //F[i]= truncate_num(F[i],2);
+      
     }
-    
+    //std::cout<<F[l]<<std::endl;
+    //int x=0;
+    //std::cin>>x;
+   }
+catch (const char* msg) {
+     std::cerr << msg << std::endl;
+   }
+
 }
 
+void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_coverage, unsigned int *kmer_coverage, double *prob_vals, unsigned int *flags)
+{
+ try
+  { 
+      
+    for(unsigned int i=0;i<nb_kmers;i++)
+    {
+       bool flag=true;
+       if(read_coverage > 1024)
+         {
+           read_coverage=1024;
+           flags[i]=0;
+           flag=false;
+         }
+       unsigned int kmer_coverage_value = kmer_coverage[i];
+       if(kmer_coverage_value >read_coverage)
+        {
+            kmer_coverage_value = read_coverage;
+            flags[i]=0;
+            flag=false;
+        }
+       double *F = (double *)malloc( sizeof( double ) * (kmer_coverage_value+1)) ;
+       get_cumulative_Poisson_distribution(F,kmer_coverage_value, read_coverage);
+       prob_vals[i]=F[kmer_coverage_value];
+       if(flag)
+          {flags[i]=1;}
+       //prob_vals[i]=truncate_num(F[kmer_coverage_value],2);
+    }
 
+   }
+  catch (const char* msg) {
+     std::cerr << msg << std::endl;
+   }     
+   
+}
+/*
+void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_coverage, unsigned int *kmer_coverage, double *prob_vals)
+{
+    
+    for(unsigned int i=0;i<nb_kmers;i++)
+    {
+       unsigned int kmer_coverage_value = kmer_coverage[i];
+       double *F = (double *)malloc( sizeof( double ) * (kmer_coverage_value+1)) ;
+       F[0]=exp(-1*read_coverage) ;
+       for(int j=1;j<=kmer_coverage_value;++j)
+       {
+         F[j]=F[j-1]+ pow(M_E, kmer_coverage_value * log(read_coverage) - read_coverage - lgamma(kmer_coverage_value + 1.0));
+       }
+       prob_vals[i]=F[kmer_coverage_value];
+     
+    }
+
+        
+   
+}
+*/
 void compute_prob_poisson_distribution(unsigned int read_coverage, unsigned int kmer_coverage, double &prob_val)
 {
    
      prob_val= pow(M_E, kmer_coverage * log(read_coverage) - read_coverage - lgamma(kmer_coverage + 1.0));
    
 }
-
+/*
 void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_coverage, unsigned int *kmer_coverage, double *prob_vals)
 {
     
@@ -36,51 +110,7 @@ void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_c
         prob_vals[i] = pow(M_E, kmer_coverage[i] * log(read_coverage) - read_coverage - lgamma(kmer_coverage[i] + 1.0));
    
 }
+*/
 
-
-void compute_distribution_untrusted_k_positions(std::vector< double> & untrust,int coverage,double error_rate, 
-                                                                                double alpha, double false_positive, bool verbose)
-{
-
-    double prob_incorr_kmer_sample=(1-exp(-1*alpha*error_rate*coverage));
-    double prob_incorr_kmer_sample_with_fb=(false_positive+((1-false_positive)*prob_incorr_kmer_sample));
-    if(verbose)
-    std::cout<<"--- probability of an incorrect kmer appears in the sample : "<<prob_incorr_kmer_sample_with_fb<<std::endl;
-    get_cumulative_binomial_distribution(untrust, kmer_size,prob_incorr_kmer_sample_with_fb) ;
-
-}
-
-void compute_threshold_k_positions(std::vector<double> untrust, std::vector<int> &threshold, double alpha)
-{
-    int x = floor(kmer_size*alpha);
-    int tk=0;
-    for(int j=0;j<=kmer_size;j++)
-    {
-
-            if(untrust[j]>= 0.9)
-             {  
-                  
-                    int tx= j+x;
-                    if(tx >= kmer_size)
-                        tx=j;
-
-                     tk=tx;
-                     threshold[kmer_size]=tk;
-
-                     break;
-             }
-
-    }
-
-    for(int i=1;i<=kmer_size;i++)
-    {
-             
-           double t1  = static_cast<double>(static_cast<double>(i)/static_cast<double>(kmer_size));
-           double t2  = (t1*tk);
-           threshold[i]=round(t2);
-
-    }
-
-}
 
 #endif
