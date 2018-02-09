@@ -28,6 +28,8 @@ int kmersUtil::nt2int(char nt)
         return 2;
     if(nt=='T'||nt=='t')
         return 3;
+
+return -1;
 }
 int kmersUtil::rev_nt2int(int nt)
 {
@@ -218,11 +220,11 @@ void kmersUtil::get_reads_spiliting_around_Ns(std::string read_seq,int read_leng
             {
                 indx=0;
 
-                while (read_seq[i] =='N' && i < read_length)
+                while (((read_seq[i] =='N')||(read_seq[i] =='n')) && i < read_length)
                 {
                     i++;
                 }
-                while ( (read_seq[i+indx] !='N') &&  ((i +indx) < read_length))
+                while ( ((read_seq[i+indx] !='N')||(read_seq[i+indx] !='n')) &&  ((i +indx) < read_length))
                 {
                     indx++;
                 }
