@@ -32,51 +32,93 @@ int compare_counts (const void * a, const void * b)
 }
 
 
-void pass_one_reads_trimming(std::string read,kmersUtil &kmers_util,double *prob_vals, unsigned int *count_vals, unsigned int *flags, unsigned int &val)
+void pass_one_reads_trimming(std::string read,kmersUtil &kmers_util,double *prob_vals, unsigned int *count_vals, unsigned int *flags, unsigned int &val, unsigned int &val2)
 {
     int i;
     unsigned int count=0;
-    unsigned int nb_kmers= read.length()-kmer_size + 1;
+    unsigned int nb_kmers=read.length()-kmer_size + 1;
+    unsigned int nb_kmers1=0;
     unsigned int median=0;
     unsigned int *counts = (unsigned int *)malloc( sizeof( unsigned int ) * (nb_kmers)) ;
     unsigned int *counts_tmp = (unsigned int *)malloc( sizeof( unsigned int ) * (nb_kmers)) ;
-        
+    bool flag =false;
+    int encode_char=0;        
     kmercode_length kmercode=0,kmercode_can=0;
     for(i=0; i<kmer_size; ++i)
     {
-      kmercode=kmercode*4+kmers_util.nt2int(read[i]);
+      encode_char=kmers_util.nt2int(read[i]);
+      if(encode_char==-1)
+        {
+           encode_char=0;
+           flag=true;
+        }
+
+      kmercode=kmercode*4+encode_char;
     }
       kmercode_can=kmers_util.get_canonical_kmer_code(kmercode);
-      count = kmers_util.get_from_table(kmercode_can);
+      if(flag)
+        {
+          count=0;
+          flag=false;
+
+        }
+      else
+       {
+         count = kmers_util.get_from_table(kmercode_can);
+       }
       count_vals[0]=count;
-      //if(count !=0)
-      counts[0]=count; 
+      if(count !=0)
+      {
+         counts[nb_kmers1]=count;
+         nb_kmers1++;
+      } 
       counts_tmp[0]=count;
     for(i=1; i<read.length()-kmer_size+1; ++i)
     {
-        kmercode=(kmercode*4+kmers_util.nt2int(read[i+(kmer_size-1)])& kmer_mask);
-        kmercode_can=kmers_util.get_canonical_kmer_code(kmercode);
-        count = kmers_util.get_from_table(kmercode_can);
-    //  if(count !=0)
-        counts[i]=count;
+      encode_char=kmers_util.nt2int(read[i+(kmer_size-1)]);
+      if(encode_char==-1)
+        {  
+           encode_char=0;
+           flag=true;
+        }
+      kmercode=(kmercode*4+encode_char& kmer_mask);
+      kmercode_can=kmers_util.get_canonical_kmer_code(kmercode);
+      if(flag)
+        {
+          count=0;
+          flag=false;
+
+        }
+      else
+       {
+         count = kmers_util.get_from_table(kmercode_can);
+
+       }
+      if(count !=0)
+        {
+            counts[nb_kmers1]=count;
+            nb_kmers1++;
+
+        }
         counts_tmp[i]=count;
         count_vals[i]=count;
     }
 
-    qsort( counts,nb_kmers, sizeof( unsigned int ), compare_counts) ;
+    qsort(counts,nb_kmers1, sizeof( unsigned int ), compare_counts) ;
     
-    if(((nb_kmers+1)%2)==0)
+    if(((nb_kmers1+1)%2)==0)
      {
-         int median_index= ((nb_kmers+1)/2);
+         int median_index= ((nb_kmers1+1)/2);
          median = counts[median_index-1];
      }
      else
      {
-        int median_index= ((nb_kmers+1)/2);
+        int median_index= ((nb_kmers1+1)/2);
             median = round((counts[median_index-1]+counts[median_index])/2);
      }
           
     val=median;
+    val2=nb_kmers1;
     compute_prob_poisson_distribution(nb_kmers,median,counts_tmp,prob_vals,flags);
 
 }//end_method
@@ -144,27 +186,34 @@ try
     {
           if (kmers_prob_file.is_open()&& kmers_count_file.is_open()&&kmers_correct_file.is_open()&&kmers_all_file.is_open())
            {
-              kmers_all_file<<"R"<<"  "<<"K"<<"  "<<"C"<<"  "<<"M"<<"  "<<"P"<<"  "<<"Co"<<"  "<<"Ca"<<std::endl;
+              kmers_all_file<<"R"<<","<<"K"<<","<<"C"<<","<<"M"<<","<<"P"<<","<<"Co"<<","<<"Ca"<<","<<"nb_kmers_used"<<","<<"nb_kmers"<<std::endl;
               while(reads.get_next_sequence(read_seq,read_length))
                {        
 
                   total_reads++;
                   total_bases+=read_seq.length();
-                  std::vector<std::string> reads_without_ns;
-                  kmers_util.get_reads_spiliting_around_Ns(read_seq,read_length,reads_without_ns);
+                  //std::vector<std::string> reads_without_ns;
+                  //kmers_util.get_reads_spiliting_around_Ns(read_seq,read_length,reads_without_ns);
                  
-                  for(int i=0;i<reads_without_ns.size();i++)
-                  {
-                      double *prob_vals = (double *)malloc( sizeof( double ) * (reads_without_ns[i].length()-kmer_size+1)) ;
-                      unsigned int *count_vals = (unsigned int *)malloc( sizeof( unsigned int) * (reads_without_ns[i].length()-kmer_size+1)) ;
-                      unsigned int *flags = (unsigned int *)malloc( sizeof( unsigned int) * (reads_without_ns[i].length()-kmer_size+1)) ;
+                  //for(int i=0;i<reads_without_ns.size();i++)
+                   // {
+                      if(read_length<kmer_size)
+                        {
+                           total_reads--; 
+                           continue;
+                        }
+                      double *prob_vals = (double *)malloc( sizeof( double ) * (read_seq.length()-kmer_size+1)) ;
+                      unsigned int *count_vals = (unsigned int *)malloc( sizeof( unsigned int) * (read_seq.length()-kmer_size+1)) ;
+                      unsigned int *flags = (unsigned int *)malloc( sizeof( unsigned int) * (read_seq.length()-kmer_size+1)) ;
                       unsigned int val=0;
-                      pass_one_reads_trimming(reads_without_ns[i], kmers_util,prob_vals,count_vals,flags,val); 
+                      unsigned int nb_kmers_used=0;
+                      //std::cout<<total_reads<<read_seq<<std::endl;
+                      pass_one_reads_trimming(read_seq, kmers_util,prob_vals,count_vals,flags,val,nb_kmers_used); 
                       
-                      for(int j=0;j<reads_without_ns[i].length()-kmer_size+1;j++)
+                      for(int j=0;j<read_seq.length()-kmer_size+1;j++)
                          {
 
-                            std::string kmer_seq=reads_without_ns[i].substr(j,kmer_size);
+                            std::string kmer_seq=read_seq.substr(j,kmer_size);
                             bool flag=true;
                             for (int l=0;l<kmer_seq.length();l++)
                                 {
@@ -179,19 +228,19 @@ try
                            if(flag)
                             {
                                kmers_correct_file <<"("<<j<<","<<"1"<<")"<<",";
-                               kmers_all_file<<total_reads<<"  "<<j<<"  "<<count_vals[j]<<"  "<<val<<"  "<<prob_vals[j]<<"  "<<"1 "<<"  "<<flags[j]<<std::endl;
+                               kmers_all_file<<total_reads<<","<<j<<","<<count_vals[j]<<","<<val<<","<<prob_vals[j]<<","<<" 1 "<<","<<flags[j]<<","<<nb_kmers_used<<","<<read_seq.length()-kmer_size+1<<std::endl;
                             }
                            else
                             {
                                kmers_correct_file <<"("<<j<<","<<"0"<<")"<<",";
-                               kmers_all_file<<total_reads<<"  "<<j<<"  "<<count_vals[j]<<"  "<<prob_vals[j]<<"  "<<"0 "<<"  "<<flags[j]<<std::endl;
+                               kmers_all_file<<total_reads<<","<<j<<","<<count_vals[j]<<","<<val<<","<<prob_vals[j]<<","<<" 0 "<<","<<flags[j]<<","<<nb_kmers_used<<","<<read_seq.length()-kmer_size+1<<std::endl;
 
                             }
                             
                        	
                          }
                          
-                  }
+                  
                   kmers_prob_file <<std::endl;
                   kmers_count_file<<std::endl;
                   kmers_correct_file<<std::endl;
