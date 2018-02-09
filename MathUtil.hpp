@@ -34,7 +34,7 @@ void get_cumulative_Poisson_distribution( double *F, int l,  double lambda)
     //int x=0;
     //std::cin>>x;
    }
-catch (const char* msg) {
+  catch (const char* msg) {
      std::cerr << msg << std::endl;
    }
 
@@ -44,16 +44,22 @@ void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_c
 {
  try
   { 
-      
+    bool zeroflag=false;
+    bool nonzeroflag=false;
+    int start_non_zero_index=0;
+    int end_non_zero_index=0;  
+    int start_zero_index=0;
+    int end_zero_index=0; 
+    
     for(unsigned int i=0;i<nb_kmers;i++)
     {
        bool flag=true;
-       if(read_coverage > 1024)
-         {
-           read_coverage=1024;
+       if(read_coverage > 128)// 1024)
+        {
+           read_coverage= 128;//1024;
            flags[i]=0;
            flag=false;
-         }
+        }
        unsigned int kmer_coverage_value = kmer_coverage[i];
        if(kmer_coverage_value >read_coverage)
         {
@@ -61,15 +67,78 @@ void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_c
             flags[i]=0;
             flag=false;
         }
+       if(kmer_coverage_value==0)
+        {
+           if(!zeroflag)
+             start_zero_index=i;
+           else
+             end_zero_index=i;
+           prob_vals[i]=0;
+           zeroflag=true;
+           continue;
+
+        }
+           
        double *F = (double *)malloc( sizeof( double ) * (kmer_coverage_value+1)) ;
        get_cumulative_Poisson_distribution(F,kmer_coverage_value, read_coverage);
        prob_vals[i]=F[kmer_coverage_value];
+       if(!nonzeroflag)
+          start_non_zero_index=i;
+       else
+          end_non_zero_index=i;
+       nonzeroflag=true;
        if(flag)
           {flags[i]=1;}
        //prob_vals[i]=truncate_num(F[kmer_coverage_value],2);
     }
+   double correct_prob=0.0; 
+  
+   if(zeroflag)
+   {
+    /*
+    for(unsigned int i=0;i<nb_kmers;i++)
+    {
+      std::cout<<prob_vals[i]<<",";
+
+    }
+   std::cout<<std::endl;
+   std::cout<<std::endl;*/
+   
+   for(unsigned int i=end_zero_index;i>=start_zero_index;i--)
+   {
+      if(i >end_non_zero_index)
+      {continue;}
+      if(i<start_non_zero_index)
+      {continue;} 
+      if (prob_vals[i]!=0)
+          {
+               correct_prob=prob_vals[i];
+               continue;
+
+           }
+      else
+          {
+             correct_prob=prob_vals[i+1];
+          }
+      prob_vals[i]=correct_prob;
+
 
    }
+
+  /*
+   std::cout<<std::endl;
+   std::cout<<std::endl;
+   for(unsigned int i=0;i<nb_kmers;i++)
+    {
+      std::cout<<prob_vals[i]<<",";
+
+    }
+     std::cout<<std::endl;
+     int x=0;
+     std::cin>>x;*/
+  }
+
+ }
   catch (const char* msg) {
      std::cerr << msg << std::endl;
    }     
