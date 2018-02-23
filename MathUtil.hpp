@@ -104,7 +104,7 @@ void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_c
    std::cout<<std::endl;
    std::cout<<std::endl;*/
    
-   for(unsigned int i=end_zero_index;i>=start_zero_index;i--)
+   for(unsigned int i=end_zero_index;i>start_zero_index;i--)
    {
       if(i >end_non_zero_index)
       {continue;}
