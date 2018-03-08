@@ -176,6 +176,8 @@ try
     uint64_t average_len=0;
     double gapped_kmer=0.0;
     std::ofstream kmers_prob_file("kmers_prob.txt",std::ios::out);
+    std::ofstream kmers_prob_file_C("kmers_prob_C.txt",std::ios::out);
+    std::ofstream kmers_prob_file_I("kmers_prob_I.txt",std::ios::out);
     std::ofstream kmers_count_file("kmers_count.txt",std::ios::out);
     std::ofstream kmers_correct_file("kmers_correct.txt",std::ios::out);
     std::ofstream kmers_all_file("kmers_info_all.txt",std::ios::out);
@@ -184,9 +186,9 @@ try
     start_time(1);
     if(nb_threads==1)
     {
-          if (kmers_prob_file.is_open()&& kmers_count_file.is_open()&&kmers_correct_file.is_open()&&kmers_all_file.is_open())
+          if (kmers_prob_file.is_open()&& kmers_count_file.is_open()&&kmers_correct_file.is_open()&&kmers_all_file.is_open()&&kmers_prob_file_C.is_open()&&kmers_prob_file_I.is_open())
            {
-              kmers_all_file<<"R"<<","<<"K"<<","<<"C"<<","<<"M"<<","<<"P"<<","<<"Co"<<","<<"Ca"<<","<<"nb_kmers_used"<<","<<"nb_kmers"<<std::endl;
+              kmers_all_file<<"R"<<","<<"K"<<","<<"C"<<","<<"M"<<","<<"P"<<","<<"Co"<<","<<"Ca"<<","<<"Cbp"<<std::endl;
               while(reads.get_next_sequence(read_seq,read_length))
                {        
 
@@ -214,28 +216,41 @@ try
                          {
 
                             std::string kmer_seq=read_seq.substr(j,kmer_size);
-                            bool flag=true;
+                            int kc=1;
+                            int bp=1;
+                            if(islower(read_seq[j]))
+                                bp=0;
+                            if(read_seq[j]=='n'||read_seq[j]=='N')
+                                bp=-1;
                             for (int l=0;l<kmer_seq.length();l++)
                                 {
-                                   if(islower(kmer_seq[l]))
-                                      flag=false;
-                                      break;
+
+                                    if(islower(kmer_seq[l]))
+                                        {
+                                           kc=0;
+                                           break;
+                                        }                                     
+                                    
                                   
                                 }
+                             for (int l=0;l<kmer_seq.length();l++)
+                                {
+
+                                   if(kmer_seq[l]=='n'||kmer_seq[l]=='N')
+                                     {
+                                        kc=-1;
+                                        break;
+
+                                     }
+                                }   
                             kmers_prob_file <<prob_vals[j]<<",";
                             kmers_count_file <<count_vals[j]<<",";
-
-                           if(flag)
-                            {
-                               kmers_correct_file <<"("<<j<<","<<"1"<<")"<<",";
-                               kmers_all_file<<total_reads<<","<<j<<","<<count_vals[j]<<","<<val<<","<<prob_vals[j]<<","<<" 1 "<<","<<flags[j]<<","<<nb_kmers_used<<","<<read_seq.length()-kmer_size+1<<std::endl;
-                            }
-                           else
-                            {
-                               kmers_correct_file <<"("<<j<<","<<"0"<<")"<<",";
-                               kmers_all_file<<total_reads<<","<<j<<","<<count_vals[j]<<","<<val<<","<<prob_vals[j]<<","<<" 0 "<<","<<flags[j]<<","<<nb_kmers_used<<","<<read_seq.length()-kmer_size+1<<std::endl;
-
-                            }
+                            kmers_correct_file <<"("<<j<<","<<kc<<")"<<",";
+                            kmers_all_file<<total_reads<<","<<j<<","<<count_vals[j]<<","<<val<<","<<prob_vals[j]<<","<<kc<<","<<flags[j]<<","<<bp<<std::endl;
+                            if(kc==1)
+                            {kmers_prob_file_C<<prob_vals[j]<<",";kmers_prob_file_I<<"-1"<<",";}
+                            if(kc==0)
+                            {kmers_prob_file_I<<prob_vals[j]<<",";kmers_prob_file_C<<"-1"<<",";}
                             
                        	
                          }
@@ -244,7 +259,8 @@ try
                   kmers_prob_file <<std::endl;
                   kmers_count_file<<std::endl;
                   kmers_correct_file<<std::endl;
-                  
+                  kmers_prob_file_C<<std::endl;
+                  kmers_prob_file_I<<std::endl;
                   
                  
                }             
@@ -253,6 +269,8 @@ try
              kmers_count_file.close();
              kmers_correct_file.close();
              kmers_all_file.close();
+             kmers_prob_file_C.close();
+             kmers_prob_file_I.close();
           }
           else
           {
