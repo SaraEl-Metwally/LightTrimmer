@@ -11,13 +11,15 @@
 struct program_options
 {
     int  k;
-    int  g;
-    int  t;
+    int  w;
+    double  t;
+    int  p;
+    std::string  n;
     std::vector<std::string> read_files;
     std::string output_prefix_name;
     std::string counting_table_name;
     bool verbose;
-    program_options():k(31),g(1),t(1),output_prefix_name("LightTrimmer"),verbose(false){}
+    program_options():k(31),w(0),t(2.0),p(21),n("keepValN"),output_prefix_name("LightTrimmer"),verbose(false){}
 };
 void print_usage()
 {
@@ -27,13 +29,15 @@ void print_usage()
     std::cerr <<" Usage: ./LightTrimmer [Options] ...FASTA/FASTQ/FASTA.gz/FASTQ.gz files"<<std::endl;
     std::cerr <<std::endl<<
     "  [-k] kmer size                                [default: 31]"<<std::endl<<
-    "  [-g] gap size                                 [default: 1] "<<std::endl<<
     "  [-c] kmers counting table                                  "<<std::endl<<
-    "  [-t] number of threads                        [default: 1] "<<std::endl<<
+    "  [-w] DUST window                              [default: read length] "<<std::endl<<
+    "  [-t] DUST threshold                           [default: 2.0] "<<std::endl<<
+    "  [-p] poly(A/T) threshold                      [default: 21] "<<std::endl<<
+    "  [-n] n's char  threshold                      [default: keepValN] "<<std::endl<<
     "  [-o] output file name                         [default: LightTrimmer] "<<std::endl;
     std::cerr <<std::endl;
     std::cerr <<" Typical LightTrimmer Command Line : "<<std::endl<<std::endl;
-    std::cerr <<" ./LightTrimmer -k 31 -g 1 -c CountingTable -t 1 -o LightTrimmer read_file1 read_file2 --verbose "<<std::endl;
+    std::cerr <<" ./LightTrimmer -k 31 -c CountingTable -t 2.0 -w readlen -p 21 -n keepValN -o LightTrimmer read_file1 read_file2 --verbose "<<std::endl;
     std::cerr <<std::endl;
     std::cerr <<" **************************************************************************************************** "<<std::endl<<std::endl ;
 
@@ -41,14 +45,16 @@ void print_usage()
 void parse_options(int argc,char **argv,program_options &opt)
 {
     int verbose_flag=0;
-    const char* opt_string =":k:g:c:o:t:";
+    const char* opt_string =":k:c:o:t:w:p:n:";
     static struct option long_options[]=
     {
         {"verbose",no_argument,&verbose_flag,1},
         {"kmer size",required_argument,NULL,'k'},
-        {"gap size",required_argument,NULL,'g'},
         {"kmers counting table",required_argument,NULL,'c'},
-        {"threads",required_argument,NULL,'t'},
+        {"dust window",required_argument,NULL,'w'},
+        {"dust threshold",required_argument,NULL,'t'},
+        {"poly a/t",required_argument,NULL,'p'},
+        {"n chars",required_argument,NULL,'n'},
         {"output file name",required_argument,NULL,'o'},
         {NULL,no_argument,NULL,0}
     };
@@ -68,18 +74,6 @@ void parse_options(int argc,char **argv,program_options &opt)
              }
 
         }       
-        else if(ch=='g')
-        {
-            std::istringstream argument(optarg);
-            if(!(argument>>opt.g)||!(argument.eof()))
-             {
-                std::cerr<<std::endl;
-                std::cerr<<"--- invalid argument of -g "<<optarg<<std::endl;
-                print_usage();
-                exit(1);
-             }
-           
-        }
         else if(ch=='t')
         {
             std::istringstream argument(optarg);
@@ -92,7 +86,49 @@ void parse_options(int argc,char **argv,program_options &opt)
              }
 
         }
-        else if(ch=='c')
+        else if(ch=='w')
+        {
+            std::istringstream argument(optarg);
+            if(!(argument>>opt.w)||!(argument.eof()))
+             {
+                std::cerr<<std::endl;
+                std::cerr<<"--- invalid argument of -w "<<optarg<<std::endl;
+                print_usage();
+                exit(1);
+             }
+
+        }
+        else if(ch=='p')
+        {
+            std::istringstream argument(optarg);
+            if(!(argument>>opt.p)||!(argument.eof()))
+             {
+                std::cerr<<std::endl;
+                std::cerr<<"--- invalid argument of -p "<<optarg<<std::endl;
+                print_usage();
+                exit(1);
+             }
+
+        }
+        else if(ch=='n')
+        {
+             opt.n=optarg;
+             std::string val1="cutAtN";
+             std::string val2="keepN";
+             std::string val3="keepValN";
+
+             if((val1.compare(opt.n)!=0)&&(val2.compare(opt.n)!=0)&&(val3.compare(opt.n)!=0))
+             {
+                std::cerr<<std::endl;
+                std::cerr<<"--- invalid argument of -n "<<optarg<<std::endl;
+                std::cerr<<"--- valid options are: cutAtN keepN keepValN "<<std::endl;
+                print_usage();
+                exit(1);
+             }
+            
+
+        }
+       else if(ch=='c')
        {
            opt.counting_table_name=optarg; 
        }
@@ -150,20 +186,15 @@ bool check_options(program_options &opt)
     }
     else
     {std::cerr<<"--- invalid value for kmer size: "<<opt.k<<std::endl;success=false;}
-    //************************** gap size**************************************************
-   /* if(opt.g>0)
-    {
-        if(opt.g>opt.k)
-            {std::cerr<<"--- supported gap sizes 1 ~ kmer_size: "<<std::endl;success=false;}
-    }
-    else */
-   /*
-    if(opt.g<=0)
-    {std::cerr<<"--- invalid value for gap size: "<<opt.g<<std::endl;success=false;}*/
-    //************************** threads **************************************************
-    if(opt.t<=0)
-    {std::cerr<<"--- invalid value for number of threads "<<opt.t<<" , value must be at least 1"<<std::endl;success=false;}
-
+    
+    //************************** DUST threshold **************************************************
+/*    if((opt.t<0.0)&&(opt.t>10.0))
+    {std::cerr<<"--- invalid value for DUST threshold "<<opt.t<<" , value must be from 0.0 to 10.0"<<std::endl;success=false;}*/
+    //************************** PolyAs/Ts **************************************************
+/*    if(opt.p<=11)
+    {std::cerr<<"--- invalid value for PolyAs/Ts threshould, it should be <= 11 "<<std::endl;success=false;}*/
+    //************************** N's Characters threshould constraints **********************
+    //if(opt.n)
     //************************** read files**************************************************
     if(opt.read_files.size()==0)
     {std::cerr<<"--- no read files specified as inputs"<<std::endl;success=false;}
@@ -200,11 +231,10 @@ int main(int argc,char** argv)
      exit(1);
     }
     kmer_size=opt.k;
-    gap_size=opt.g;
     kmer_mask=((static_cast<kmercode_length>(1))<<(kmer_size*2))-1;
     prefix=opt.output_prefix_name;
     start_time(0);
-    init(opt.read_files,opt.counting_table_name,opt.t,opt.verbose);
+    init(opt.read_files,opt.counting_table_name,opt.t,opt.p,opt.n,opt.w,opt.verbose);
     std::cout<<std::endl;
     //std::cout<<"------------------------------------------------------------------"<<std::endl;
     //std::cout<<"-------------------{ Trimming process finished }------------------"<<std::endl;

@@ -40,7 +40,7 @@ void get_cumulative_Poisson_distribution( double *F, int l,  double lambda)
 
 }
 
-void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_coverage, unsigned int *kmer_coverage, double *prob_vals, unsigned int *flags)
+void compute_prob_poisson_distribution(unsigned int nb_kmers,int read_coverage, int *kmer_coverage, double *prob_vals, unsigned int *flags,std::string ns)
 {
  try
   { 
@@ -50,6 +50,8 @@ void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_c
     int end_non_zero_index=0;  
     int start_zero_index=0;
     int end_zero_index=0; 
+    double *median_prob = (double *)malloc( sizeof( double ) * (read_coverage+1)) ;
+    get_cumulative_Poisson_distribution(median_prob,read_coverage, read_coverage);   
     
     for(unsigned int i=0;i<nb_kmers;i++)
     {
@@ -60,25 +62,43 @@ void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_c
            flags[i]=0;
            flag=false;
         }
-       unsigned int kmer_coverage_value = kmer_coverage[i];
+       int kmer_coverage_value = kmer_coverage[i];
        if(kmer_coverage_value >read_coverage)
-        {
-            kmer_coverage_value = read_coverage;
+       {
+            //kmer_coverage_value = read_coverage;
             flags[i]=0;
             flag=false;
-        }
+            prob_vals[i]=median_prob[read_coverage];
+            if(!nonzeroflag)
+                start_non_zero_index=i;
+            else
+                end_non_zero_index=i;
+            nonzeroflag=true;
+            continue;
+       }
+       if(kmer_coverage_value==-1)
+       { 
+            flags[i]=0;
+            flag=false;
+            prob_vals[i]=1;//previously was 0
+            continue;
+
+       }
        if(kmer_coverage_value==0)
-        {
+       {
+            flags[i]=0;
+            flag=false;
+           
            if(!zeroflag)
              start_zero_index=i;
            else
              end_zero_index=i;
            prob_vals[i]=0;
-           zeroflag=true;
+             zeroflag=true;
            continue;
 
         }
-           
+       
        double *F = (double *)malloc( sizeof( double ) * (kmer_coverage_value+1)) ;
        get_cumulative_Poisson_distribution(F,kmer_coverage_value, read_coverage);
        prob_vals[i]=F[kmer_coverage_value];
@@ -90,6 +110,8 @@ void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_c
        if(flag)
           {flags[i]=1;}
        //prob_vals[i]=truncate_num(F[kmer_coverage_value],2);
+       
+
     }
    double correct_prob=0.0; 
   
@@ -102,7 +124,11 @@ void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_c
 
     }
    std::cout<<std::endl;
-   std::cout<<std::endl;*/
+   std::cout<<std::endl;
+   std::cout<<"start zero"<<start_zero_index<<std::endl;
+   std::cout<<"end zero"<<end_zero_index<<std::endl;
+   std::cout<<"start non zero"<<start_non_zero_index<<std::endl;
+   std::cout<<"end non zero"<<end_non_zero_index<<std::endl;*/
    
    for(unsigned int i=end_zero_index;i>start_zero_index;i--)
    {
@@ -114,13 +140,16 @@ void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_c
           {
                correct_prob=prob_vals[i];
                continue;
-
            }
       else
           {
-             correct_prob=prob_vals[i+1];
+               correct_prob=prob_vals[i+1];
           }
+
+      if(ns=="keepValN")
       prob_vals[i]=correct_prob;
+      else if(ns=="keepN")
+      prob_vals[i]=1;
 
 
    }
@@ -180,6 +209,22 @@ void compute_prob_poisson_distribution(unsigned int nb_kmers,unsigned int read_c
    
 }
 */
+void get_cumulative_binomial_distribution( std::vector<double> & F, int l, double p )
+{
+    // p is the probability of getting 1.
+    int i ;
+    double coef = 1 ;
+    double exp = pow( 1 - p, l ) ;
+    F[0] = pow( 1 - p, l ) ;
+    
+    for ( i = 1 ; i <= l ; ++i )
+    {
+        coef = coef / i * ( l - i + 1 ) ;
+        exp =  exp / ( 1 - p ) * p ;
+        F[i] = F[i - 1] + coef * exp ;
+    }
+    
+}
 
 
 #endif
