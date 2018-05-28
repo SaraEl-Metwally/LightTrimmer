@@ -46,19 +46,25 @@ void compute_prob_poisson_distribution(unsigned int nb_kmers,int read_coverage, 
   { 
     bool zeroflag=false;
     bool nonzeroflag=false;
+    bool adjusted=false;
     int start_non_zero_index=0;
     int end_non_zero_index=0;  
     int start_zero_index=0;
     int end_zero_index=0; 
+    if(read_coverage > 128)// 1024)
+    {
+           read_coverage= 128;//1024;
+           adjusted=true;
+    }
     double *median_prob = (double *)malloc( sizeof( double ) * (read_coverage+1)) ;
     get_cumulative_Poisson_distribution(median_prob,read_coverage, read_coverage);   
     
     for(unsigned int i=0;i<nb_kmers;i++)
     {
        bool flag=true;
-       if(read_coverage > 128)// 1024)
+       if(adjusted)
         {
-           read_coverage= 128;//1024;
+           //read_coverage= 128;//1024;
            flags[i]=0;
            flag=false;
         }
@@ -69,6 +75,11 @@ void compute_prob_poisson_distribution(unsigned int nb_kmers,int read_coverage, 
             flags[i]=0;
             flag=false;
             prob_vals[i]=median_prob[read_coverage];
+          /*if(std::isinf(prob_vals[i]))
+            {
+            std::cout<<prob_vals[i]<<std::endl;
+            int y=0;
+            std::cin>>y;}*/            
             if(!nonzeroflag)
                 start_non_zero_index=i;
             else
@@ -81,6 +92,11 @@ void compute_prob_poisson_distribution(unsigned int nb_kmers,int read_coverage, 
             flags[i]=0;
             flag=false;
             prob_vals[i]=1;//previously was 0
+            if(!nonzeroflag)
+                start_non_zero_index=i;
+            else
+                end_non_zero_index=i;
+            nonzeroflag=true;
             continue;
 
        }

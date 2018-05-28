@@ -10,7 +10,8 @@
 #include <typeinfo>
 #include <fstream>
 #include <map>
-
+#include <limits>
+#include <math.h>
 void help_me()
 {
 
@@ -62,16 +63,20 @@ double calculateDustScore(const std::string& seq)
 }
 
 // Returns the window over seq with the highest dust score
+
 double maxDustWindow(const std::string& seq, size_t windowSize=64, size_t minWindow=64)
 {
     double maxScore = 0.0f;
-    for(size_t i = 0; i < seq.size(); i += 1)
+    std::string temp=seq;
+    std::transform(temp.begin(), temp.end(), temp.begin(), ::tolower);
+    for(size_t i = 0; i < temp.size(); i += 1)
     {
-        size_t r = seq.size() - i;
+        size_t r = temp.size() - i;
         size_t w = r < windowSize ? r : windowSize;
         if(w >= minWindow) // don't calculate score for small windows
         {
-            double s = calculateDustScore(seq.substr(i, w));
+            
+            double s = calculateDustScore(temp.substr(i, w));
             if(s > maxScore)
                 maxScore = s;
         }
@@ -80,7 +85,7 @@ double maxDustWindow(const std::string& seq, size_t windowSize=64, size_t minWin
 }
 
 
-void pass_one_reads_trimming(std::string read,kmersUtil &kmers_util,double *prob_vals, int *count_vals, unsigned int *flags, int &val, unsigned int &val2,double dust, std::string ns)
+bool pass_one_reads_trimming(std::string read,kmersUtil &kmers_util,double *prob_vals, int *count_vals, unsigned int *flags, int &val, unsigned int &val2,double dust, std::string ns)
 {
     
     int i;
@@ -114,16 +119,41 @@ void pass_one_reads_trimming(std::string read,kmersUtil &kmers_util,double *prob
       }
    else
      {
-         std::string kmer_seq=read.substr(0,kmer_size);
-         double globalDustScore = maxDustWindow(kmer_seq,kmer_size,kmer_size);
-         if(globalDustScore > static_cast<double>(dust))
-            count=-1;
-         else 
+       
+       if(dust!=-1)
+       {
+          std::string kmer_seq=read.substr(0,kmer_size);
+          double globalDustScore = maxDustWindow(kmer_seq,kmer_size,kmer_size);
+          if(globalDustScore > static_cast<double>(dust))
+           { 
+              count=-1;
+              /*
+              std::cout<<kmer_seq<<std::endl;
+              std::cout<<globalDustScore<<std::endl;
+              int y=0;
+              std::cin>>y;*/
+           }
+          else 
             {
                 kmercode_can=kmers_util.get_canonical_kmer_code(kmercode);
                 count = kmers_util.get_from_table(kmercode_can);
             }
-   
+        }//disable dust check
+        else
+        {
+
+                kmercode_can=kmers_util.get_canonical_kmer_code(kmercode);
+                count = kmers_util.get_from_table(kmercode_can);
+
+        }
+        /*
+
+        kmercode_can=kmers_util.get_canonical_kmer_code(kmercode);
+        count = kmers_util.get_from_table(kmercode_can);
+        if(count>=3000)
+           count=-1;
+        else
+          count=count;*/
      }
     count_vals[0]=count;
     if(count >1)
@@ -150,16 +180,39 @@ void pass_one_reads_trimming(std::string read,kmersUtil &kmers_util,double *prob
       }
      else
      {
-         std::string kmer_seq=read.substr(i,kmer_size);
-         double globalDustScore = maxDustWindow(kmer_seq,kmer_size,kmer_size);
-         if(globalDustScore > static_cast<double>(dust))
-            count=-1;
-         else
+       
+       if(dust !=-1)
+        {
+          std::string kmer_seq=read.substr(i,kmer_size);
+          double globalDustScore = maxDustWindow(kmer_seq,kmer_size,kmer_size);
+          if(globalDustScore > static_cast<double>(dust))
+            {
+              count=-1;
+              /*
+              std::cout<<kmer_seq<<std::endl;
+              std::cout<<globalDustScore<<std::endl;
+              int y=0;
+              std::cin>>y;*/
+            }
+          else
             { 
                 kmercode_can=kmers_util.get_canonical_kmer_code(kmercode);
                 count = kmers_util.get_from_table(kmercode_can);
             }
-    
+         } //disable dust check
+      else
+       {
+                kmercode_can=kmers_util.get_canonical_kmer_code(kmercode);
+                count = kmers_util.get_from_table(kmercode_can);
+
+       }
+       /*
+        kmercode_can=kmers_util.get_canonical_kmer_code(kmercode);
+        count = kmers_util.get_from_table(kmercode_can);
+        if(count>=3000)
+           count=-1;
+        else
+          count=count;*/
      }
 
      if(count >1)
@@ -190,7 +243,11 @@ void pass_one_reads_trimming(std::string read,kmersUtil &kmers_util,double *prob
     val=median;
     val2=nb_kmers1; 
     compute_prob_poisson_distribution(nb_kmers,median,counts_tmp,prob_vals,flags,ns);
+    return true;
   }
+  else
+    return false;
+
 }//end_method
 bool poly_as_ts_reads_trimming(std::string read,int poly,std::string &trimmed_read,kmersUtil &kmers_util)
 {
@@ -434,7 +491,7 @@ try
 //************************** Step 1: preprocessing the kmers counting table **************************************************
     
     reads_parsing reads(read_files);
-    uint64_t total_bases=0;uint64_t total_reads=0;uint64_t total_trimmed_reads=0;uint64_t total_lowcomplex_reads=0;
+    uint64_t total_bases=0;uint64_t total_reads=0;uint64_t total_trimmed_reads=0;uint64_t total_lowcomplex_reads=0;;uint64_t total_unchanged_reads=0;
     std::string read_seq="";int read_length=0;
     uint64_t average_len=0;
     std::ofstream kmers_prob_file("kmers_prob.txt",std::ios::out);
@@ -482,20 +539,33 @@ try
                       window=read_length;
 
                    double globalDustScore = maxDustWindow(trimmed_read,window,window);
+                   
+
                    if(globalDustScore >static_cast<double>( dust))
                    {
+                   /*  std::cout<<trimmed_read<<std::endl;
+                       std::cout<<globalDustScore<<std::endl;
+                       std::cout<<"low complexity"<<std::endl;
+                       int y=0;
+                       std::cin>>y;*/
                        total_lowcomplex_reads++;
                        continue;
 
                    }
+                 
                 }
-
+                 /*
+                  std::cout<<trimmed_read<<std::endl;
+                  int y=0;
+                  std::cin>>y;*/
                   double *prob_vals = (double *)malloc( sizeof( double ) * (read_length-kmer_size+1)) ;
                   int *count_vals = (int *)malloc( sizeof(int) * (read_length-kmer_size+1)) ;
                   unsigned int *flags = (unsigned int *)malloc( sizeof( unsigned int) * (read_length-kmer_size+1)) ;
                   int val=0;
                   unsigned int nb_kmers_used=0;
-                  pass_one_reads_trimming(trimmed_read, kmers_util,prob_vals,count_vals,flags,val,nb_kmers_used,10.0,ns); 
+                  bool pass=  pass_one_reads_trimming(trimmed_read, kmers_util,prob_vals,count_vals,flags,val,nb_kmers_used,6.0,ns); 
+                  if(pass==false)
+                  total_unchanged_reads++;
                   for(int j=0;j<read_length-kmer_size+1;j++)
                     {
 
@@ -526,15 +596,25 @@ try
                                         break;
 
                                      }
-                                }   
+                                }
+                            
+                            if(std::isnan(prob_vals[j]))
+                               {
+                                 std::cout<<trimmed_read<<std::endl;
+                                 std::cout<<kmer_seq<<std::endl;
+                                 std::cout<<"count: "<<count_vals[j]<<"  median : "<<val<<std::endl;
+                                 int y=0;
+                                 std::cin>>y;}
                             kmers_prob_file <<prob_vals[j]<<",";
                             kmers_count_file <<count_vals[j]<<",";
                             kmers_correct_file <<"("<<j<<","<<kc<<")"<<",";
                             kmers_all_file<<total_reads<<","<<j<<","<<count_vals[j]<<","<<val<<","<<prob_vals[j]<<","<<kc<<","<<flags[j]<<","<<bp<<std::endl;
                             if(kc==1)
-                            {kmers_prob_file_C<<prob_vals[j]<<",";kmers_prob_file_I<<"-1"<<",";}
+                            {kmers_prob_file_C<<prob_vals[j]<<",";kmers_prob_file_C<<"-1"<<",";}
                             if(kc==0)
-                            {kmers_prob_file_I<<prob_vals[j]<<",";kmers_prob_file_C<<"-1"<<",";}
+                            {kmers_prob_file_I<<prob_vals[j]<<",";kmers_prob_file_I<<"-1"<<",";}
+                            if(pass==false)
+                            {kmers_prob_file_C<<1<<",";kmers_prob_file_C<<"-1"<<",";}
                             
                        	
                          }
@@ -582,6 +662,7 @@ try
               std::cout<<"--- total number of reads ="<<total_reads<<std::endl;
               std::cout<<"--- total number of poly(A|T)'s trimmed reads = "<<total_trimmed_reads<<std::endl;       
               std::cout<<"--- total number of low complexity trimmed reads= "<<total_lowcomplex_reads<<std::endl;
+              std::cout<<"--- total number of unchanged reads= "<<total_unchanged_reads<<std::endl;
     }
 }
    

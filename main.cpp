@@ -19,7 +19,7 @@ struct program_options
     std::string output_prefix_name;
     std::string counting_table_name;
     bool verbose;
-    program_options():k(31),w(0),t(2.0),p(21),n("keepValN"),output_prefix_name("LightTrimmer"),verbose(false){}
+    program_options():k(31),w(0),t(6.0),p(21),n("keepValN"),output_prefix_name("LightTrimmer"),verbose(false){}
 };
 void print_usage()
 {
